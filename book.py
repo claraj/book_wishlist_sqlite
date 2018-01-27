@@ -17,13 +17,20 @@ class Book:
 
 
     def __str__(self):
-        read_str = 'no'
-        if self.read:
-            read_str = 'yes'
 
-        id_str = self.id
-        if id == -1:
-            id_str = '(no id)'
+        read_str = 'yes' if self.read else 'no'
+        id_str = '(no id)' if self.id == -1 else self.id
 
         template = 'id: {} Title: {} Author: {} Read: {}'
         return template.format(id_str, self.title, self.author, read_str)
+
+    def __repr__(self):
+        return 'id: {} | title: {} | author: {} | read: {}'.format(self.id, self.title, self.author, self.read)
+
+
+    def __eq__(self, other):
+        if isinstance(other, Book):
+            return self.id == other.id and self.title == other.title and self.author == other.author and self.read==other.read
+
+    def __ne__(self, other):
+        return not self == other

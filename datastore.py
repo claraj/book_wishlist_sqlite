@@ -1,6 +1,7 @@
 import sqlite3
 
 from book import Book
+from util import tf_val, num_val
 
 DB_NAME = 'wishlist.db'
 BOOK_TABLE = 'books'
@@ -9,104 +10,74 @@ TITLE = 'title'
 AUTHOR = 'author'
 READ = 'read'
 
+createsql = 'CREATE TABLE IF NOT EXISTS {} ( {} INTEGER PRIMARY KEY, {} TEXT, {} TEXT, {} INTEGER )'.format(BOOK_TABLE, ID, TITLE, AUTHOR, READ)  # 0 = False, 1 = True
+
 
 def setup():
-    '''Connect to database, creates book table if it doesn't exist.'''
-    conn = sqlite3.connect(DB_NAME)
-    createsql = 'CREATE TABLE IF NOT EXISTS {} ( {} INTEGER PRIMARY KEY, {} TEXT, {} TEXT, {} INTEGER )'.format(BOOK_TABLE, ID, AUTHOR, TITLE, READ)  # 0 = False, 1 = True
-    conn.execute(createsql)    # Creates an intermediate cursor object
-    conn.commit()
-    conn.close()
+    """ Connect to database, creates book table if it doesn't exist. """
+    with sqlite3.connect(DB_NAME) as conn:
+        conn.execute(createsql)    # Creates an intermediate cursor object
 
 
 def shutdown():
-    '''Any DB shutdown/cleanup tasks can go here'''
+    """ Any DB shutdown/cleanup tasks can go here """
     pass    # May be needed in future?
 
 
 def get_books(**kwargs):
-    ''' Return books from DB. With no arguments, returns everything. '''
-
-    sql = None
+    """ Return books from DB. With no arguments, returns everything. """
 
     books = []
 
-    if kwargs == None:
+    if kwargs == {}:
         sql = 'SELECT * FROM {}'.format(BOOK_TABLE)
 
-    if kwargs['read'] == True:
+    elif kwargs['read'] == True:
         sql = 'SELECT * FROM {} WHERE {} = 1'.format(BOOK_TABLE, READ)
 
-    if kwargs['read'] == False:
+    elif kwargs['read'] == False:
         sql = 'SELECT * FROM {} WHERE {} = 0'.format(BOOK_TABLE, READ)
 
     if sql:
 
-        conn = sqlite3.connect(DB_NAME)
-        conn.row_factory = sqlite3.Row  # This type of row can be accessed by column name
-        cur = conn.cursor()
-        rows = cur.execute(sql)
+        with sqlite3.connect(DB_NAME) as conn:
+            conn.row_factory = sqlite3.Row  # This type of row can be accessed by column name
+            cur = conn.cursor()
+            rows = cur.execute(sql)
 
-        for row in rows:
-            read_bool = tf_val(row[3])
-            book = Book(row[TITLE], row[AUTHOR], read_bool, row[ID])
-            books.append(book)
-
-        conn.close()
+            for row in rows:
+                read_bool = tf_val(row[READ])
+                book = Book(row[TITLE], row[AUTHOR], read_bool, row[ID])
+                books.append(book)
 
     return books
 
 
 
-
 def add_book(book):
-    ''' Add to db, set id value, return Book'''
+    """ Add to db, set id value, return Book """
 
-    conn = sqlite3.connect(DB_NAME)
-    cur = conn.cursor()
+    with sqlite3.connect(DB_NAME) as conn:
+        cur = conn.cursor()
 
-    sql_template = 'INSERT INTO {}({}, {}, {}) VALUES (?, ?, ?)'.format(BOOK_TABLE, AUTHOR, TITLE, READ) # Autoincrement
+        sql_template = 'INSERT INTO {} ({}, {}, {}) VALUES (?, ?, ?)'.format(BOOK_TABLE, TITLE, AUTHOR, READ) # Remember ID autoincrements
+        sql_values = (book.title, book.author, num_val(book.read) )
+        cur.execute(sql_template, sql_values)
 
-    print(book.title)
-    print(book.author)
-    print(book.read)
+        book_id = cur.lastrowid
+        book.set_id(book_id)
 
-    sql_values = (book.title, book.author, num_val(book.read) )
-    cur.execute(sql_template, sql_values)
-
-    book_id = cur.lastrowid
-    book.set_id(book_id)
-
-    conn.commit()
-    conn.close()
-
-    return book
+        return book
 
 
 def set_read(book_id, read):
-    '''Update book with given book_id to read. Return True if book is found in DB and update is made, False otherwise.'''
+    """ Update book with given book_id to read boolean.
+    Return True if book is found in DB and update is made, False otherwise. """
 
     read_update = num_val(read)
     sql = 'UPDATE {} SET {} = ? WHERE {} = ?'.format(BOOK_TABLE, READ, ID)
 
-    conn = sqlite3.connect(DB_NAME)
-    cur = conn.cursor()
-    cur.execute(sql, (read_update, book_id) )
-    conn.commit()
-    conn.close()
-
-    return cur.rowcount > 0 # return True if rows were changed.
-
-
-# Utility methods
-def tf_val(number):
-    '''Convert 0 to False and 1 (or any other value) to True'''
-    return number != 0
-
-
-def num_val(bool_val):
-    '''Convert True to 1 and False to 0'''
-    if bool_val:
-        return 1
-    else:
-        return 0
+    with sqlite3.connect(DB_NAME) as conn:
+        cur = conn.cursor()
+        cur.execute(sql, (read_update, book_id) )
+        return cur.rowcount > 0 # return True if rows were changed.
