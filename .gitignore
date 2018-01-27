@@ -1,3 +1,4 @@
 *.pyc
 __pycache__
 wishlist.db
+wishlist_test.db
